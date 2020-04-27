@@ -57,6 +57,82 @@ typeof window !== 'undefined' ? window : this, function (window, noGlobal) {
     };
 
     /**
+     * 是否为window对象
+     * @param {object} obj 
+     * @return {boolean} 是否为window
+     * 不是null，并且obj自己身上有一个window属性，那么obj就是window
+     */
+    var isWindow = function isWindow(obj) { // L87
+        /**
+         * 运算符优先级：
+         * != 非等号 10.3
+         * === 全等号 10.2
+         * && 逻辑与 6
+         * 
+         * A && B A的值为真，则返回B；A的值为假，则返回A
+         */
+        return obj != null && obj === obj.window;
+    }
+
+    var document = window.document; // L92
+
+        // => 保留脚本属性Script脚本的属性
+        var preservedScriptAttributes = { // L96
+            type:true,
+            src:true,
+            nonce:true,
+            noModule:true
+        };
+
+        /**
+         * 
+         * @param {*} code 
+         * @param {*} node  {nonce:options && options.nonce}
+         * @param {*} doc 
+         */
+        function DOMEval(code, node, doc){ // L103
+            doc = doc || document;
+
+            // => window.document.createElement('script') 创建 script标签
+            var i, val,
+                script = doc.createElement('script');
+
+            script.text = code;
+            if (node) { // L110
+                for (i in preservedScriptAttributes) { // L111
+                    // Support: Firefox 64+, Edge 18+
+                    // Some browsers don't support the "nonce" property on scripts.
+                    // On the other hand, just using `getAttribute` is not enough as
+                    // the `nonce` attribute is reset to an empty string whenever it
+                    // becomes browsing-context connected.
+                    // See https://github.com/whatwg/html/issues/2369
+                    // See https://html.spec.whatwg.org/#nonce-attributes
+                    // The `node.getAttribute` check was added for the sake of
+                    // `jQuery.globalEval` so that it can fake a nonce-containing node
+                    // via an object.
+                    /*
+                        支持浏览器 Firefox 64+, Edge 18+
+                        有些浏览器不支持脚本上的“nonce”属性。
+                        另一方面，仅仅使用“getAttribute”还不够
+                        “nonce”属性在任何时候都重置为空字符串
+                        连接浏览上下文。
+                        // See https://github.com/whatwg/html/issues/2369
+                        // See https://html.spec.whatwg.org/#nonce-attributes
+                        添加“node.getAttribute”检查是为了
+                        `jQuery.globalEval`以便它可以伪造包含nonce的节点
+                        通过一个物体。
+                    */
+                    val = node[i] || node.getAttribute && node.getAttribute(i);
+                    if (val) {
+                        script.setAttribute(i, val);
+                    }
+                }
+            }
+            
+            doc.head.appendChild(script).parentNode.removeChild(script);
+        }
+
+    /**
      * 2020年4月23日09:36:50
      * L153
      * @param {*} selector 用来查找的字符串
@@ -118,6 +194,7 @@ typeof window !== 'undefined' ? window : this, function (window, noGlobal) {
      * L253
      * jQuery作为对象角色，有一个方法extend
      * jQuery.fn是jQuery.prototype，上面有一个方法 extend——实例可以调用
+     * todo:深拷贝的原理需要手写一遍
      * @params 
      *      1个 {}，默认不是深拷贝
      *      多个：boolean 控制是否深拷贝 object 需要拷贝的内容
@@ -285,16 +362,24 @@ typeof window !== 'undefined' ? window : this, function (window, noGlobal) {
      * L325
      * 调用对象jQuery上的extend方法
      * 实参：一个对象
+     * 默认jQuery对象上扩展的方法
      */
     jQuery.extend({//L325
         // 'jQuery35005631369788094318' 生成这样的随机数：版本号+0~1之间的随机数，把所有不是数字的都干掉
-        expando: 'jQuery' + (version + Math.random()).replace(/\D/g, ''),
+        expando: 'jQuery' + (version + Math.random()).replace(/\D/g, ''), // L328
         // Assume jQuery is ready without the ready module
         // 假设jQuery在没有ready模块的情况下已经就绪
-        isReady: true,
-        error: function () { },
-        noop: function () { },
+        isReady: true, // L331
         /**
+         * @param {人类可阅读的错误信息} msg 
+         */
+        error: function (msg) { // L333
+            // => 通过Error的构造器可以创建一个错误对象。当运行时错误产生时，Error的实例对象会被抛出。Error对象也可用于用户自定义的异常的基础对象。下面列出了各种内建的标准错误类型。
+            throw new Error(msg);
+        },
+        noop: function () { }, // L337
+        /**
+         * 是否为对象
          * @param {Object} obj 
          * @return {Boolean} 判断 obj 是否为Object类
          * plain[plein]adj.清楚的；直接的；
@@ -312,7 +397,7 @@ typeof window !== 'undefined' ? window : this, function (window, noGlobal) {
              * 如果obj是FALSE的情况，!FALSE=>可以进入判断体
              * 如果obj不是FALSE的情况，!obj=>false，则判断 obj不是对象类型的才可以进入判断体
              */
-            if(!obj || toString.call(obj) !== '[object Object]'){
+            if(!obj || toString.call(obj) !== '[object Object]'){ // L344
                 return false;
             }
 
@@ -320,7 +405,8 @@ typeof window !== 'undefined' ? window : this, function (window, noGlobal) {
             proto = getProto(obj);// 返回obj的原型是啥，没有返回null
             
             // Objects with no prototype (e.g., `Object.create( null )`) are plain
-            if (!proto){ // 如果没有的话，走到判断体里面去
+            if (!proto){ // L351
+                // 如果没有的话，走到判断体里面去
                 return true;
             }
 
@@ -366,12 +452,25 @@ typeof window !== 'undefined' ? window : this, function (window, noGlobal) {
              */
             return typeof Ctor === 'function' && fnToString.call(Ctor) === ObjectFunctionString; //L357
         },
-        isEmptyObject: function () { },
+        /**
+         * 判断是否为空对象：原理，循环它，能循环则不是空对象
+         * @params {object} obj
+         * @return {boolean} 空对象：true
+         */
+        isEmptyObject: function (obj) { // L360
+            var name;
+            for (name in obj) {
+                return false;
+            }
+            return true;
+        },
         // Evaluates a script in a provided context; falls back to the global one
         // if not specified.
         // 在提供的上下文中计算脚本；返回全局脚本
         // 如果未指定
-        globalEval: function () { },
+        globalEval: function (code, options, doc) { // L371
+            DOMEval(code, {nonce: options && options.nonce}, doc);
+        },
         each: function () { },
         // results is for internal usage only
         // 结果仅供内部使用

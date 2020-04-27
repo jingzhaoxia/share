@@ -28,8 +28,18 @@
         // => Object.prototype.hasOwnProperty 判断是否是自己的属性 返回布尔值
         var hasOwn = class2type.hasOwnProperty; // L69
 
+        // => hasOwn是函数类的实例，hasOwn.toString调取的是Function.prototype.toString
+        // => Function.prototype.toString() 返回一个表示当前函数源代码的字符串。
+        // => Function.prototype.toString(Function.prototype.toString) 返回 "function toString() { [native code] }" 这是内置方法
+        var fnToString = hasOwn.toString; // L71
 
-        var support = {};
+        // => Function.prototype.toString.call(Object);
+        // => 返回值 "function Object() { [native code] }"
+        // => ObjectFunctionString = "function Object() { [native code] }"
+        // => 现在是一个字符串，Object对象类的函数字符串
+        var ObjectFunctionString = fnToString.call(Object); // L73
+
+        var support = {}; // L75
 
         /**
          * 判断是否为function
@@ -179,9 +189,48 @@
                         // 如果合并纯对象或数组，则递归
                         /**
                          * => A && B A 为真，则返回B；A || B A为真，则返回A
+                         * => A || B ：A为真，则返回A；A不为真，则返回B
+                         * 运算符优先级：
+                         * () 圆括号 20
+                         * && 逻辑与6
+                         * || 逻辑或5
+                         * = 赋值 3
                          */
-                        if (deep && copy && (jQuery.isPlainObject(copy))) {
+                        /**
+                         * deep && copy && (jQuery.isPlainObject(copy) || (copyIsArray = Array.isArray(copy)))
+                         * deep && copy && C
+                         * C => jQuery.isPlainObject(copy) || (copyIsArray = Array.isArray(copy))
+                         * C => A2 || B2 【A2:判断copy是否为Object构造函数类】
+                         *      【如果A2为真，则返回A2；如果A2不为真，则返回B2】
+                         * B2 => copyIsArray = Array.isArray(copy) 【copyIsArray是布尔值】
+                         * B2 => 【判断每一个copy值是否为数组，并把结果赋值给变量copyIsArray】
+                         *      （1）Array.isArray(copy)
+                         *      （2）变量copyIsArray
+                         *      （3）赋值
+                         * 
+                         */
+                        // => 存在deep并且存在copy，并且copy要么是Object函数类，要么是数组，都可以进入判断体
+                        if (deep && copy && (jQuery.isPlainObject(copy) || 
+                        (copyIsArray = Array.isArray(copy)))) { //L297
+                            src = target[name];
+
+                            /**
+                             * 【TODO】到这里啦~
+                             */
+                            if (copyIsArray && !Array.isArray(src)) {
+                                clone = [];
+                            } else if (!copyIsArray && !jQuery.isPlainObject(src)) {
+                                clone = {};
+                            } else {
+                                clone = src;
+                            }
+                            copyIsArray = false;
+
+                            target[name] = jQuery.extend(deep, clone, copy);
                             
+                        } else if (copy !== undefined){ // L314
+                            // => 
+                            target[name] = copy;
                         }
 
                     }
@@ -206,6 +255,11 @@
             isReady: true,
             error: function () { },
             noop: function () { },
+            /**
+             * @param {Object} obj 
+             * @return {Boolean} 判断 obj 是否为Object类
+             * plain[plein]adj.清楚的；直接的；
+             */
             isPlainObject: function (obj) { // L339
                 var proto, Ctor;
                 // Detect obvious negatives
@@ -233,12 +287,45 @@
 
                 // Objects with prototype are plain iff they were constructed by a global Object function
                 // 具有原型的对象是简单的，如果它们是由全局对象函数构造的
-                // => hasOwn.call(proto, 'constructor)
+                // => hasOwn.call(proto, 'constructor) 判断是否为私有属性，返回布尔值
+                // => A && B：A为真，则返回B；A不为真，则返回A
+                // => 获取obj对象原型上的constructor构造器属性
+                // => 所有的函数都有一个prototype原型属性，在原型上天生自带一个constructor属性，它的值是当前函数类
+                // => 所有的对象天生自带一个__proto__原型链，指向所属类的原型
+                // => 如果obj的原型上有constructor属性，那么他就是函数
                 Ctor = hasOwn.call(proto, 'constructor') && proto.constructor;
+                
                 /**
-                 * 返回了一个boolean
+                 * 运算符优先级
+                 * typeof 16
+                 * === 10
+                 * && 6
                  */
-                return typeof Ctor === 'function' && fnToString.call(Ctor) === ObjectFunctionString;
+                /**
+                 * 基本数据类型值7个：string、number、boolean、null、undefined、symbol、bigint
+                 * typeof 1n === 'bigint'
+                 * typeof '' === 'string'
+                 * typeof NaN === 'number'
+                 * typeof Infinity === 'number'
+                 * typeof true === 'boolean'
+                 * typeof null === 'object'
+                 * typeof undefined === 'undefined'
+                 * typeof Symbol(1) === 'symbol'
+                 * 
+                 * 引用数据类型值
+                 * object
+                 *      {}普通对象/^$/正则 Math数学函数....
+                 * function
+                 *      typeof function (){} === 'function'
+                 */
+                /**
+                 * typeof obj.prototype.constructor === 'function
+                 * ({}).hasOwnProperty.toString.call(obj.prototype.constructor) === 'function Object() {[native code]}'
+                 */
+                /**
+                 * 返回了一个boolean：判断obj是否为 Object对象类
+                 */
+                return typeof Ctor === 'function' && fnToString.call(Ctor) === ObjectFunctionString; //L357
             },
             isEmptyObject: function () { },
             // Evaluates a script in a provided context; falls back to the global one
